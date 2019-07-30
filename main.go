@@ -18,23 +18,23 @@ func main() {
 	}
 
 	dec := bencode.NewDecoder(file)
-	var meta metaInfo
-	if err := dec.Decode(&meta); err != nil {
+	var torrent torrentFile
+	if err := dec.Decode(&torrent); err != nil {
 		fmt.Printf("failed to decode torrent file: %v\n", err)
 		return
 	}
-	fmt.Printf("%+v\n", meta)
+	fmt.Printf("%+v\n", torrent)
 }
 
-type metaInfo struct {
-	Announce string
+type torrentFile struct {
+	Announce string `bencode:"announce"`
 	Info     struct {
-		PieceLen int64 `bencode:"piece length"`
-		Pieces   string
-		Length   int64
+		PieceLen int64  `bencode:"piece length"`
+		Pieces   string `bencode:"pieces"`
+		Length   int64  `bencode:"length"`
 		Files    []struct {
-			Length int64
-			Path   []string
+			Length int64    `bencode:"length"`
+			Path   []string `bencode:"path"`
 		}
-	}
+	} `bencode:"info"`
 }
