@@ -1,12 +1,15 @@
 package torrent
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
 	"github.com/zeebo/bencode"
 	"io"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -29,6 +32,23 @@ type File struct {
 	} `bencode:"info"`
 }
 
+// TrackerResponse contains data returned by the tracker upon the announce request.
+// See: https://wiki.theory.org/index.php/BitTorrentSpecification#Tracker_Response
+type TrackerResponse struct {
+	FailureReason  string `bencode:"failure reason"`
+	WarningMessage string `bencode:"warning message"`
+	Interval       int    `bencode:"interval"`
+	MinInterval    int    `bencode:"min interval"`
+	TrackerId      string `bencode:"tracker id"`
+	Complete       int    `bencode:"complete"`
+	Incomplete     int    `bencode:"incomplete"`
+	Peers          []struct {
+		PeerId string `bencode:"peer id"`
+		IP     string `bencode:"ip"`
+		Port   int    `bencode:"port"`
+	} `bencode:"peers"`
+}
+
 // Parse extract a metainfo from the torrent file specified by path argument.
 func Parse(path string) (*File, error) {
 	file, err := os.Open(path)
@@ -43,8 +63,9 @@ func Parse(path string) (*File, error) {
 	return &tFile, nil
 }
 
-// GetPeers ???
-func (f *File) GetPeers() ([]string, error) {
+// MakeAnnounceRequest sends the announce request to the tracker to get info required to participate in torrent.
+// In particular, it contains a list of peers with a file we want to download.
+func (f *File) MakeAnnounceRequest() (*TrackerResponse, error) {
 	u, err := url.Parse(f.Announce)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse announce URL: %v", err)
@@ -56,13 +77,25 @@ func (f *File) GetPeers() ([]string, error) {
 	u.RawQuery = params.Encode()
 	resp, err := http.Get(u.String())
 	if err != nil {
-		return nil, fmt.Errorf("annonce request failed: %v", err)
+		return nil, fmt.Errorf("get request failed: %v", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
-
-	return []string{}, nil
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read responce body: %v", err)
+	}
+	body := bytes.NewBuffer(bodyBytes)
+	log.Printf("responce body:\"%s\"", body.String())
+	dec := bencode.NewDecoder(body)
+	var tResp TrackerResponse
+	err = dec.Decode(&tResp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse tracker response: %v", err)
+	}
+	return &tResp, nil
 }
 
+// See: https://wiki.theory.org/index.php/BitTorrentSpecification#Tracker_Request_Parameters
 func peersRequestParams(tFile *File) (url.Values, error) {
 	params := url.Values{}
 	infoHash, err := tFile.infoHash()
@@ -71,7 +104,16 @@ func peersRequestParams(tFile *File) (url.Values, error) {
 	}
 	params.Add("info_hash", base64.StdEncoding.EncodeToString(infoHash))
 	peerId := make([]byte, 20)
-	_, err = rand.Read(peerId)
+	peerId[0] = '-'
+	peerId[1] = 'M'
+	peerId[2] = 'K'
+	peerId[3] = '0'
+	peerId[4] = '1'
+	peerId[5] = '0'
+	peerId[6] = '0'
+	peerId[7] = '-'
+	_, err = rand.Read(peerId[8:])
+	log.Printf("peer id: %s%v\n", string(peerId[0:8]), peerId[8:])
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate peer id: %v", err)
 	}

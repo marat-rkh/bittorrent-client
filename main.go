@@ -14,5 +14,10 @@ func main() {
 		fmt.Printf("failed to parse torrent file: %v\n", err)
 		return
 	}
-	fmt.Printf("%+v\n", tFile)
+	resp, err := tFile.MakeAnnounceRequest()
+	if err != nil {
+		fmt.Printf("announce request failed: %v\n", err)
+		return
+	}
+	fmt.Printf("%+v\n", resp)
 }
