@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/sha1"
+	"encoding/binary"
 	"fmt"
 	"github.com/zeebo/bencode"
 	"io"
@@ -35,14 +36,18 @@ type fileInfo struct {
 // TrackerResponse contains data returned by the tracker upon the announce request.
 // See: https://wiki.theory.org/index.php/BitTorrentSpecification#Tracker_Response
 type TrackerResponse struct {
-	FailureReason  string `bencode:"failure reason"`
-	WarningMessage string `bencode:"warning message"`
-	Interval       int    `bencode:"interval"`
-	MinInterval    int    `bencode:"min interval"`
-	TrackerId      string `bencode:"tracker id"`
-	Complete       int    `bencode:"complete"`
-	Incomplete     int    `bencode:"incomplete"`
-	Peers          string `bencode:"peers"`
+	WarningMessage string
+	Interval       int64
+	MinInterval    int64
+	TrackerId      string
+	Complete       int64
+	Incomplete     int64
+	Peers          []PeerInfo
+}
+
+type PeerInfo struct {
+	IP   string
+	Port uint16
 }
 
 // Parse extracts a metainfo from the torrent file specified by path argument.
@@ -51,18 +56,18 @@ func Parse(path string) (*File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open torrent file: %v\n", err)
 	}
-	var decoded map[string]interface{}
+	var metainfoMap map[string]interface{}
 	d := bencode.NewDecoder(file)
-	if err := d.Decode(&decoded); err != nil {
+	if err := d.Decode(&metainfoMap); err != nil {
 		return nil, fmt.Errorf("failed to decode torrent file: %v\n", err)
 	}
 	var tFile File
-	announce, ok := decoded["announce"]
+	announce, ok := metainfoMap["announce"]
 	if !ok {
 		return nil, fmt.Errorf("cannot find 'announce' field in the torrent file")
 	}
 	tFile.announce = announce.(string)
-	info, ok := decoded["info"]
+	info, ok := metainfoMap["info"]
 	if !ok {
 		return nil, fmt.Errorf("cannot find 'info' field in the torrent file")
 	}
@@ -141,14 +146,75 @@ func (f *File) MakeAnnounceRequest() (*TrackerResponse, error) {
 		return nil, fmt.Errorf("failed to read responce body: %v", err)
 	}
 	body := bytes.NewBuffer(bodyBytes)
-	log.Printf("responce body: \"%s\"", body.String())
-	dec := bencode.NewDecoder(body)
-	var tResp TrackerResponse
-	err = dec.Decode(&tResp)
+	log.Printf("responce body: \"%s\"\n", body.String())
+	return parseResponse(body)
+}
+
+func parseResponse(resp *bytes.Buffer) (*TrackerResponse, error) {
+	dec := bencode.NewDecoder(resp)
+	var respMap map[string]interface{}
+	err := dec.Decode(&respMap)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse tracker response: %v", err)
+		return nil, fmt.Errorf("failed to parse announce response: %v", err)
+	}
+	log.Printf("decoded responce: %+v\n", respMap)
+	if fail, ok := respMap["failure reason"]; ok {
+		return nil, fmt.Errorf("announce request failed: %v", fail)
+	}
+	var tResp TrackerResponse
+	if warn, ok := respMap["warning message"]; ok {
+		tResp.WarningMessage = warn.(string)
+	}
+	interval, ok := respMap["interval"]
+	if !ok {
+		return nil, fmt.Errorf("cannot find 'interval' field in the announce responce")
+	}
+	tResp.Interval = interval.(int64)
+	if minInterval, ok := respMap["min interval"]; ok {
+		tResp.MinInterval = minInterval.(int64)
+	}
+	if tID, ok := respMap["tracker id"]; ok {
+		tResp.TrackerId = tID.(string)
+	}
+
+	if complete, ok := respMap["complete"]; ok {
+		tResp.Complete = complete.(int64)
+	}
+	if incomplete, ok := respMap["incomplete"]; ok {
+		tResp.Incomplete = incomplete.(int64)
+	}
+	tResp.Peers, err = parsePeers(respMap)
+	if err != nil {
+		return nil, err
 	}
 	return &tResp, nil
+}
+
+func parsePeers(respMap map[string]interface{}) ([]PeerInfo, error) {
+	peers, ok := respMap["peers"]
+	if !ok {
+		return nil, fmt.Errorf("cannot find 'peers' field in the announce responce")
+	}
+	peersStr, ok := peers.(string)
+	if !ok {
+		return nil, fmt.Errorf("'peers' field in the announce responce is not a string (dictinary mode is not supported yet)")
+	}
+	peersBytes := []byte(peersStr)
+	if len(peersBytes)%6 != 0 {
+		return nil, fmt.Errorf("'peers' field in the announce responce has incorrect size, must be N * 6")
+	}
+	var peersList []PeerInfo
+	for i := 0; i < len(peersBytes); i += 6 {
+		peer := peersBytes[i : i+6]
+		var ipParts []string
+		for _, b := range peer[:4] {
+			ipParts = append(ipParts, strconv.Itoa(int(b)))
+		}
+		ip := strings.Join(ipParts, ".")
+		port := binary.BigEndian.Uint16(peer[4:])
+		peersList = append(peersList, PeerInfo{ip, port})
+	}
+	return peersList, nil
 }
 
 // See: https://wiki.theory.org/index.php/BitTorrentSpecification#Tracker_Request_Parameters
