@@ -19,5 +19,6 @@ func main() {
 		fmt.Printf("announce request failed: %v\n", err)
 		return
 	}
-	fmt.Printf("%+v\n", resp)
+	download := torrent.NewDownload(tFile, resp)
+	download.Start()
 }
