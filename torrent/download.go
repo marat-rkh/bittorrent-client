@@ -56,9 +56,17 @@ func (s *session) start() error {
 		return fmt.Errorf("failed to connect to peer: %v", err)
 	}
 	rw := bufio.NewReadWriter(bufio.NewReader(conn), bufio.NewWriter(conn))
-	_, err = rw.Write(handshake())
+	_, err = rw.Write(handshakeMsg())
 	if err != nil {
 		return fmt.Errorf("handshake failed: %v", err)
+	}
+	err = readHandshake(rw.Reader)
+	if err != nil {
+		return fmt.Errorf("failed to read responce handshake: %v", err)
+	}
+	_, err = rw.Write(interestedMsg())
+	if err != nil {
+		return fmt.Errorf("failed to send 'interested' message: %v", err)
 	}
 	go s.requestPieces()
 	for {
@@ -71,7 +79,24 @@ func (s *session) start() error {
 	}
 }
 
-func handshake() []byte {
+func handshakeMsg() []byte {
+	// TODO
+	return nil
+}
+
+func readHandshake(r *bufio.Reader) error {
+	pstrlenBuf := make([]byte, 1)
+	_, err := io.ReadFull(r, pstrlenBuf)
+	if err != nil {
+		return err
+	}
+	pstrlen := pstrlenBuf[0]
+	restBuf := make([]byte, pstrlen+8+20)
+	_, err = io.ReadFull(r, restBuf)
+	return err
+}
+
+func interestedMsg() []byte {
 	// TODO
 	return nil
 }
