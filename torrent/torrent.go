@@ -22,6 +22,7 @@ import (
 type File struct {
 	announce string
 	info     struct {
+		pieces string
 		length int64
 		files  []fileInfo
 	}
@@ -77,6 +78,9 @@ func Parse(path string) (*File, error) {
 		return nil, fmt.Errorf("failed to calculate 'info' hash")
 	}
 	tFile.infoHash = hash
+	if pieces, ok := infoMap["pieces"]; ok {
+		tFile.info.pieces = pieces.(string)
+	}
 	if length, ok := infoMap["length"]; ok {
 		tFile.info.length = length.(int64)
 	} else if files, ok := infoMap["files"]; ok {
@@ -248,4 +252,8 @@ func (f *File) length() int64 {
 		res += file.length
 	}
 	return res
+}
+
+func (f *File) PiecesNumber() int64 {
+	return int64(len(f.info.pieces) / 20)
 }
