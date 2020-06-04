@@ -68,13 +68,20 @@ func (s *session) start() error {
 	if err != nil {
 		return fmt.Errorf("failed to send 'interested' message: %v", err)
 	}
-	go s.requestPieces()
 	for {
 		msg, err := readMessage(rw.Reader)
 		if err != nil {
 			return err
 		}
 		switch msg.id {
+		case choke:
+			s.handleChoke()
+		case unchoke:
+			s.handleUnchoke()
+		case have:
+			s.handleHave()
+		case piece:
+			s.handlePiece()
 		}
 	}
 }
@@ -141,7 +148,18 @@ const (
 	port
 )
 
-func (s *session) requestPieces() {
-	// TODO we should close `s.piecesQueue` when all values in `Download.status.values` are `received`
-	// for piece := range s.piecesQueue {}
+func (s *session) handleChoke() {
+
+}
+
+func (s *session) handleUnchoke() {
+
+}
+
+func (s *session) handleHave() {
+
+}
+
+func (s *session) handlePiece() {
+
 }
