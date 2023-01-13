@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="test ubuntu" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="bittorrent-client" />
+    <working_directory value="$PROJECT_DIR$" />
+    <parameters value="-torrent=testData/ubuntu-22.04.1-desktop-amd64.iso.torrent" />
+    <kind value="PACKAGE" />
+    <package value="bittorrent-client" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/main.go" />
+    <method v="2" />
+  </configuration>
+</component>
