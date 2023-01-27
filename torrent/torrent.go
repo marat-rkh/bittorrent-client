@@ -96,10 +96,7 @@ func Parse(path string) (*File, error) {
 func infoHash(decodedInfoMap interface{}) ([]byte, error) {
 	info := strings.Builder{}
 	enc := bencode.NewEncoder(&info)
-	err := enc.Encode(decodedInfoMap)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode torrent info: %v", err)
-	}
+	enc.Encode(decodedInfoMap)
 	hash := sha1.New()
 	_, _ = io.WriteString(hash, info.String())
 	return hash.Sum(nil), nil
