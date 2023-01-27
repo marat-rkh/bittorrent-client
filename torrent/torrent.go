@@ -9,8 +9,11 @@ import (
 	"strings"
 )
 
-// File contains metainfo from the torrent file.
-// See: https://wiki.theory.org/index.php/BitTorrentSpecification#Metainfo_File_Structure
+type fileInfo struct {
+	length int64
+	path   []string
+}
+
 type File struct {
 	announce string
 	info     struct {
@@ -21,13 +24,6 @@ type File struct {
 	infoHash []byte
 }
 
-type fileInfo struct {
-	length int64
-	path   []string
-}
-
-// TrackerResponse contains data returned by the tracker upon the announce request.
-// See: https://wiki.theory.org/index.php/BitTorrentSpecification#Tracker_Response
 type TrackerResponse struct {
 	WarningMessage string
 	Interval       int64
@@ -43,7 +39,6 @@ type PeerInfo struct {
 	Port uint16
 }
 
-// Parse extracts a metainfo from the torrent file specified by path argument.
 func Parse(path string) (*File, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -101,6 +96,7 @@ func Parse(path string) (*File, error) {
 func infoHash(decodedInfoMap interface{}) ([]byte, error) {
 	info := strings.Builder{}
 	enc := bencode.NewEncoder(&info)
+	// TODO inspection and fix
 	err := enc.Encode(decodedInfoMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode torrent info: %v", err)
@@ -109,6 +105,10 @@ func infoHash(decodedInfoMap interface{}) ([]byte, error) {
 	_, _ = io.WriteString(hash, info.String())
 	return hash.Sum(nil), nil
 }
+
+// TODO add this project to Space to demonstrate remote dev
+// TODO subtests?
+// TODO change signature: many files changed, show preview. Or show usage updated close to definition.
 
 func asStringSlice(is []interface{}) []string {
 	var ss []string
