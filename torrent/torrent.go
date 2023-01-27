@@ -96,7 +96,6 @@ func Parse(path string) (*File, error) {
 func infoHash(decodedInfoMap interface{}) ([]byte, error) {
 	info := strings.Builder{}
 	enc := bencode.NewEncoder(&info)
-	// TODO inspection and fix
 	err := enc.Encode(decodedInfoMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode torrent info: %v", err)
@@ -105,10 +104,6 @@ func infoHash(decodedInfoMap interface{}) ([]byte, error) {
 	_, _ = io.WriteString(hash, info.String())
 	return hash.Sum(nil), nil
 }
-
-// TODO add this project to Space to demonstrate remote dev
-// TODO subtests?
-// TODO change signature: many files changed, show preview. Or show usage updated close to definition.
 
 func asStringSlice(is []interface{}) []string {
 	var ss []string
